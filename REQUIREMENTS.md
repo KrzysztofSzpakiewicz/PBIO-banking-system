@@ -110,6 +110,26 @@ Przepływy danych i granice zaufania
 3. Aplikacja ↔ dostawca uwierzytelniania / poczty ↔ skrzynka e-mail: tokeny, kody i komunikaty integracji wymagają weryfikacji. Bezpieczeństwo logowania zależy również od bezpieczeństwa skrzynki.
 
 
+
+Scenariusze zagrożeń
+
+
+Zagrożenie - Dostęp do cudzego rachunku przez podmianę identyfikatora w żądaniu 
+Dotyczy - Dane rachunków i historia operacji 
+Możliwe konsekwencje - Ujawnienie cudzych danych lub wykonanie nieuprawnionego przelewu 
+Planowane zabezpieczenie - Sprawdzanie po stronie API właściciela rachunku na podstawie zalogowanej sesji
+
+Zagrożenie - Zgadywanie kodów logowania
+Dotyczy - Uwierzytelnianie użytkowników
+Możliwe konsekwencje - Nieuprawnione zalogowanie na konto
+Planowane zabezpieczenie - Jednorazowe kody, krótki czas ważności i ograniczenie liczby prób
+
+Zagrożenie - Równoczesne zlecenie przelewów przekraczających saldo 
+Dotyczy - Salda i przelewy 
+Możliwe konsekwencje - Wydanie tych samych środków więcej niż raz lub ujemne saldo 
+Planowane zabezpieczenie - Transakcje bazodanowe i blokady rekordów podczas sprawdzania oraz aktualizacji salda |
+
+
 Ryzyko pozostałe i ograniczenia
 - Osoba kontrolująca skrzynkę może zalogować się jako jej właściciel. Logowanie wyłącznie e-mailem nie zapewnia niezależnego drugiego czynnika.
 - Potwierdzenie przelewu w interfejsie nie stanowi dodatkowego czynnika uwierzytelniania i nie chroni w pełni po przejęciu sesji.

@@ -6,3 +6,5 @@ Głównym założeniem systemu jest bezpieczny i intuicyjny proces onboardingu �
 wykorzystując do rejestracji i autoryzacji wyłącznie adres e-mail. 
 System pozwoli na przelewy, zarządzanie rachunkiem, tworzenie nowych rachunków.
 Możliwe, że do logowania i rejestracji zostanie użyty zewnętrzny dostawca autoryzacji np. clerk.
+
+Aplikacja będzie symulatorem bankowości internetowej przeznaczonym dla osób chcących poznać podstawowe operacje bankowe bez używania prawdziwych pieniędzy. Po rejestracji i zalogowaniu za pomocą adresu e-mail użytkownik będzie mógł tworzyć rachunki, sprawdzać saldo, wykonywać przelewy fikcyjnych środków oraz przeglądać historię operacji. Projekt umożliwi naukę korzystania z bankowości elektronicznej w środowisku testowym.
