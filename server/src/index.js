@@ -10,8 +10,22 @@ app.get("/", (req, res) => {
   });
 });
 
-const PORT = 4000;
+const { checkConnection } = require("./db/pool");
 
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+const PORT = process.env.PORT || 4000;
+
+async function start() {
+  try {
+    await checkConnection();
+    console.log("Połączono z PostgreSQL");
+  } catch (err) {
+    console.error("Nie można połączyć się z bazą danych:", err.message);
+    process.exit(1);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+start();
