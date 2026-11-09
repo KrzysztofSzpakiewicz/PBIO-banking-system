@@ -11,15 +11,18 @@ app.get("/", (req, res) => {
 });
 
 const { checkConnection } = require("./db/pool");
+const { runMigrations } = require("./db/migrate");
+
 
 const PORT = process.env.PORT || 4000;
 
 async function start() {
   try {
+    await runMigrations();
     await checkConnection();
     console.log("Połączono z PostgreSQL");
   } catch (err) {
-    console.error("Nie można połączyć się z bazą danych:", err.message);
+    console.error("Błąd inicjalizacji bazy danych:", err.message);
     process.exit(1);
   }
 
