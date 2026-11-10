@@ -11,4 +11,5 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/accounts", label: "Rachunki", icon: "wallet" },
   { href: "/transfers", label: "Przelewy", icon: "transfer" },
   { href: "/history", label: "Historia", icon: "history" },
+  { href: "/status", label: "Status", icon: "pulse" },
 ];
