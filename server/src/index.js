@@ -1,18 +1,9 @@
-const express = require("express");
-
-const app = express();
-
-app.use(express.json());
-
-app.get("/", (req, res) => {
-  res.json({
-    message: "Bank API is running",
-  });
-});
-
+const { createApp } = require("./app");
 const { checkConnection } = require("./db/pool");
 
 const PORT = process.env.PORT || 4000;
+
+const app = createApp({ checkDatabase: checkConnection });
 
 async function start() {
   try {
