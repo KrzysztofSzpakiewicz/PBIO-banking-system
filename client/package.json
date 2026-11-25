@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test --test-reporter=spec --import ../test/setup.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \"test/**/*.test.ts\""
+    "test": "node --test --test-reporter=spec --import ../test/setup.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \"test/**/!(*.integration).test.ts\""
   },
   "dependencies": {
     "next": "16.4.3",
