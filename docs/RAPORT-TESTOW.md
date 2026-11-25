@@ -185,6 +185,12 @@ Dla porównania: przed issue #19 `npm test` zgłaszał 15 testów, z czego 6 jak
 
 ![Wynik npm test przed poprawkami](img/npm-test-przed-poprawkami.png)
 
+Szczegóły niezaliczonych asercji, np. odpowiedź HTML ze śladem stosu zamiast JSON i data 09.11 zamiast 10.11:
+
+![Szczegóły błędów przed poprawkami – formatPLN i formatDate](img/npm-test-przed-poprawkami2.png)
+
+![Szczegóły błędów przed poprawkami – obsługa błędów API](img/npm-test-przed-poprawkami3.png)
+
 ## 5. Ograniczenia
 
 - API nie ma jeszcze uwierzytelniania ani endpointów rachunków i przelewów (schemat bazy już jest). Scenariuszy typu „użytkownik A odczytuje lub obciąża rachunek użytkownika B” (kryterium akceptacji nr 2) nie da się jeszcze przetestować. Trzeba je dodać razem z implementacją (issue #20).
