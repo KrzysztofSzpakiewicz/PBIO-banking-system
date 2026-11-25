@@ -22,7 +22,7 @@ Szczegółowe wymagania funkcjonalne i bezpieczeństwa: [REQUIREMENTS.md](REQUIR
 | `admin/` | panel administratora (Next.js) |
 | `server/src/` | API (Express.js) |
 | `server/test/`, `client/test/` | testy jednostkowe (uruchamiane poleceniem `npm test`) |
-| `test/setup.mjs`, `package.json` | wspólna konfiguracja i skrypty testów |
+| `test/setup.mjs`, `package.json` | wspólna konfiguracja i skrypty testów (jednostkowych i integracyjnych) |
 | `db/init/` | skrypty inicjalizujące bazę danych (role i uprawnienia) |
 | `docker-compose.yml` | baza danych PostgreSQL |
 | `.env.example` | szablon konfiguracji (kopiowany do `.env`) |
@@ -184,8 +184,13 @@ Testy korzystają z wbudowanego w Node.js modułu `node:test` – nie wymagają 
 | `npm run test:watch` | ponowne uruchamianie testów po każdej zmianie pliku |
 | `npm run test:coverage` | testy z raportem pokrycia kodu |
 | `npm test --prefix server` / `npm test --prefix client` | testy tylko jednej części |
+| `npm run test:integration` | testy integracyjne: uruchamia bazę (`docker compose up -d --wait db`) i wykonuje testy |
+| `npm run test:integration:run` | testy integracyjne bez uruchamiania bazy (gdy baza już działa) |
+| `npm run test:all` | testy jednostkowe, a po nich integracyjne |
 
 **Struktura.** Testy leżą w katalogu `test/` danej części i odwzorowują strukturę kodu, np. `client/lib/format.ts` → `client/test/lib/format.test.ts`. Pliki pomocnicze (bez sufiksu `.test`) trafiają do `test/helpers/`. Wspólna konfiguracja (`test/setup.mjs` w katalogu głównym) ustawia strefę czasową UTC i podstawia pusty moduł za pakiet `server-only` z Next.js.
+
+**Testy integracyjne** sprawdzają współpracę części systemu z prawdziwą bazą PostgreSQL z `docker-compose.yml`: API ↔ baza, uprawnienia ról z `db/init/01-roles.sh` oraz aplikację klienta ↔ API ↔ baza. Wymagają Dockera i pliku `.env` (kopia `.env.example`); dane dostępowe są czytane z `DATABASE_URL` i `MIGRATION_DATABASE_URL`. Pliki mają sufiks `.integration.test.*` i leżą w `test/integration/` danej części – `npm test` je pomija. Testy działają na bazie deweloperskiej `bank`, ale tworzą tylko tymczasowe tabele o unikalnych nazwach (`it_test_…`) i usuwają je po sobie. Gdy baza nie działa, kończą się czytelnym komunikatem z poleceniem do uruchomienia.
 
 **Nazewnictwo.** Blok `describe` nazywa testowaną jednostkę (funkcję, moduł lub endpoint), a nazwa testu opisuje po polsku oczekiwany wynik i warunek, w schemacie *„<co robi>, gdy <warunek>”*, np.:
 
@@ -194,7 +199,7 @@ formatPLN › zgłasza błąd, gdy kwota przekracza zakres bezpiecznych liczb ca
 GET /health zwraca 503, gdy sprawdzenie bazy rzuca wyjątek synchronicznie
 ```
 
-**Znane błędy.** Test, który wykrył błąd jeszcze niepoprawiony, ma opcję `{ todo: "Problem N z issue #16: …" }`. Jest uruchamiany i widoczny w raporcie jako `✖ … # Problem N…`, ale nie przerywa `npm test`. Po poprawieniu błędu należy usunąć opcję `todo` – od tej chwili test pilnuje, żeby błąd nie wrócił.
+**Znane błędy.** Test, który wykrył błąd jeszcze niepoprawiony, ma opcję `{ todo: "Problem N z issue #NN: …" }` (numer issue, w którym opisano błąd). Jest uruchamiany i widoczny w raporcie jako `✖ … # Problem N…`, ale nie przerywa `npm test`. Po poprawieniu błędu należy usunąć opcję `todo` – od tej chwili test pilnuje, żeby błąd nie wrócił.
 
 ## Bezpieczeństwo konfiguracji
 
