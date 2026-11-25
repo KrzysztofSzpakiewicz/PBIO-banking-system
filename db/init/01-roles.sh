@@ -11,6 +11,11 @@ ALTER DATABASE :"DBNAME" OWNER TO bank_migrator;
 REVOKE ALL ON DATABASE :"DBNAME" FROM PUBLIC;
 GRANT CONNECT ON DATABASE :"DBNAME" TO bank_app;
 
+-- Domyślnie każda rola (PUBLIC) może łączyć się z bazami systemowymi.
+-- Konta aplikacji mają mieć dostęp wyłącznie do bazy projektu.
+REVOKE CONNECT ON DATABASE postgres FROM PUBLIC;
+REVOKE CONNECT ON DATABASE template1 FROM PUBLIC;
+
 ALTER SCHEMA public OWNER TO bank_migrator;
 REVOKE CREATE ON SCHEMA public FROM PUBLIC;
 GRANT USAGE ON SCHEMA public TO bank_app;

@@ -5,6 +5,9 @@ const { startServer } = require("../helpers/start-server");
 
 // Ta część nie wymaga uruchomionej bazy: w jej miejscu działa serwer TCP, który przyjmuje
 // połączenie i nigdy nie odpowiada (np. przeciążona baza albo zerwana sieć).
+// Limit czasu jest skrócony z domyślnych 2 s, żeby test działał szybko.
+const TIMEOUT_MS = 200;
+
 describe("GET /health z bazą, która nie odpowiada", () => {
   const sockets = new Set();
   let fakeDatabase;
@@ -22,7 +25,7 @@ describe("GET /health z bazą, która nie odpowiada", () => {
     process.env.DATABASE_URL = `postgres://bank_app:change-me@127.0.0.1:${port}/bank`;
     const db = require("../../src/db/pool");
     pool = db.pool;
-    server = await startServer(db.checkConnection);
+    server = await startServer(db.checkConnection, { healthTimeoutMs: TIMEOUT_MS });
   });
 
   after(async () => {
@@ -32,7 +35,7 @@ describe("GET /health z bazą, która nie odpowiada", () => {
     await pool?.end();
   });
 
-  it("zwraca 503 przed upływem 3 s, gdy PostgreSQL przyjmuje połączenie, ale nie odpowiada", async (t) => {
+  it("zwraca 503 po upływie limitu czasu, gdy PostgreSQL przyjmuje połączenie, ale nie odpowiada", async (t) => {
     t.mock.method(console, "error", () => {});
     const started = Date.now();
 
@@ -41,6 +44,8 @@ describe("GET /health z bazą, która nie odpowiada", () => {
 
     assert.equal(res.status, 503);
     assert.deepEqual(body.services, { api: "ok", database: "error" });
-    assert.ok(Date.now() - started < 3_000, "odpowiedź powinna przyjść po limicie 2 s z routes/health.js");
+    const elapsed = Date.now() - started;
+    assert.ok(elapsed >= TIMEOUT_MS - 5, `odpowiedź przed upływem limitu (${elapsed} ms)`);
+    assert.ok(elapsed < TIMEOUT_MS + 1_000, `odpowiedź długo po upływie limitu (${elapsed} ms)`);
   });
 });

@@ -9,7 +9,7 @@ const {
 } = require("../helpers/database");
 
 // Sprawdza uprawnienia nadane przez db/init/01-roles.sh (zasada minimalnych uprawnień z README).
-// Testy oznaczone `todo` opisują błędy zgłoszone w issue #17 (do poprawy w osobnym zadaniu).
+// Błąd wykryty drugim testem (Problem 1 z issue #17) poprawiono w issue #19.
 
 describe("Uprawnienia konta bank_app (db/init/01-roles.sh)", () => {
   const table = uniqueTableName();
@@ -51,17 +51,13 @@ describe("Uprawnienia konta bank_app (db/init/01-roles.sh)", () => {
     }
   });
 
-  it(
-    "nie może łączyć się z bazami innymi niż bank, gdy podaje poprawne hasło",
-    { todo: "Problem 1 z issue #17: bank_app łączy się z bazami postgres i template1" },
-    async () => {
-      for (const database of ["postgres", "template1"]) {
-        await assert.rejects(
-          connect(withDatabase(appUrl, database)).then((client) => client.end()),
-          /permission denied for database/,
-          `bank_app nie powinien mieć dostępu do bazy ${database}`,
-        );
-      }
-    },
-  );
+  it("nie może łączyć się z bazami innymi niż bank, gdy podaje poprawne hasło", async () => {
+    for (const database of ["postgres", "template1"]) {
+      await assert.rejects(
+        connect(withDatabase(appUrl, database)).then((client) => client.end()),
+        /permission denied for database/,
+        `bank_app nie powinien mieć dostępu do bazy ${database}`,
+      );
+    }
+  });
 });

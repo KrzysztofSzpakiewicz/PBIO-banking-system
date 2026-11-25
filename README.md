@@ -21,7 +21,8 @@ Szczegółowe wymagania funkcjonalne i bezpieczeństwa: [REQUIREMENTS.md](REQUIR
 | `client/` | aplikacja klienta (Next.js) |
 | `admin/` | panel administratora (Next.js) |
 | `server/src/` | API (Express.js) |
-| `server/test/`, `client/test/` | testy jednostkowe (uruchamiane poleceniem `npm test`) |
+| `server/test/`, `client/test/` | testy jednostkowe, integracyjne i scenariusze bezpieczeństwa (sekcja *Testy*) |
+| `docs/RAPORT-TESTOW.md` | raport z wynikami testów |
 | `test/setup.mjs`, `package.json` | wspólna konfiguracja i skrypty testów (jednostkowych i integracyjnych) |
 | `db/init/` | skrypty inicjalizujące bazę danych (role i uprawnienia) |
 | `docker-compose.yml` | baza danych PostgreSQL |
@@ -170,46 +171,75 @@ docker compose start db
 
 ## Testy
 
-Wszystkie testy jednostkowe uruchamia jedno polecenie w katalogu głównym repozytorium:
+Szczegółowy opis każdego testu i wyniki ostatniego uruchomienia: [docs/RAPORT-TESTOW.md](docs/RAPORT-TESTOW.md).
+
+### Narzędzie
+
+Testy korzystają z wbudowanego w Node.js modułu **`node:test`** (runner, `describe`/`it`, atrapy `t.mock`) oraz **`node:assert/strict`** (asercje). To odpowiednik Jest wbudowany w Node.js, więc testy nie wymagają dodatkowych pakietów. Pliki `.ts` aplikacji klienta są uruchamiane bez kompilacji (Node.js ≥ 22.18).
+
+### Uruchomienie
+
+Jedno polecenie uruchamia **wszystkie testy** (jednostkowe, endpointu, bezpieczeństwa i integracyjne). Wymaga Dockera i pliku `.env`, a bazę uruchamia samo:
 
 ```bash
-npm test
+npm run test:all
 ```
 
-Testy korzystają z wbudowanego w Node.js modułu `node:test` – nie wymagają dodatkowych pakietów, uruchomionej bazy danych ani serwera. Wystarczą zależności zainstalowane krokiem `npm ci --prefix server` z sekcji *Instalacja* oraz **Node.js ≥ 22.18** (pliki `.ts` są uruchamiane bez kompilacji).
+| Polecenie | Działanie | Wymaga bazy |
+|---|---|---|
+| `npm run test:all` | wszystkie testy: najpierw `npm test`, potem `npm run test:integration` | tak (uruchamia ją) |
+| `npm test` | testy jednostkowe, test endpointu i scenariusz bezpieczeństwa 2 | nie |
+| `npm run test:integration` | testy integracyjne i scenariusz bezpieczeństwa 1: uruchamia bazę (`docker compose up -d --wait db`) i wykonuje testy | tak (uruchamia ją) |
+| `npm run test:integration:run` | jak wyżej, bez uruchamiania bazy (gdy baza już działa) | tak |
+| `npm run test:security` | tylko oba scenariusze bezpieczeństwa (`server/test/security/`) | tak (uruchamia ją) |
+| `npm run test:watch` | ponowne uruchamianie `npm test` po każdej zmianie pliku | nie |
+| `npm run test:coverage` | `npm test` z raportem pokrycia kodu | nie |
+| `npm test --prefix server` / `npm test --prefix client` | testy jednostkowe tylko jednej części | nie |
 
-| Polecenie | Działanie |
-|---|---|
-| `npm test` | wszystkie testy (API + biblioteki aplikacji klienta) |
-| `npm run test:watch` | ponowne uruchamianie testów po każdej zmianie pliku |
-| `npm run test:coverage` | testy z raportem pokrycia kodu |
-| `npm test --prefix server` / `npm test --prefix client` | testy tylko jednej części |
-| `npm run test:integration` | testy integracyjne: uruchamia bazę (`docker compose up -d --wait db`) i wykonuje testy |
-| `npm run test:integration:run` | testy integracyjne bez uruchamiania bazy (gdy baza już działa) |
-| `npm run test:security` | tylko scenariusze bezpieczeństwa (`server/test/security/`, uruchamia bazę) |
-| `npm run test:all` | testy jednostkowe, a po nich integracyjne |
+Do `npm test` wystarczą zależności z `npm ci --prefix server` (sekcja *Instalacja*). Testy integracyjne czytają dane dostępowe z `DATABASE_URL` i `MIGRATION_DATABASE_URL` w pliku `.env` (kopia `.env.example`).
 
-**Struktura.** Testy leżą w katalogu `test/` danej części i odwzorowują strukturę kodu, np. `client/lib/format.ts` → `client/test/lib/format.test.ts`. Pliki pomocnicze (bez sufiksu `.test`) trafiają do `test/helpers/`. Wspólna konfiguracja (`test/setup.mjs` w katalogu głównym) ustawia strefę czasową UTC i podstawia pusty moduł za pakiet `server-only` z Next.js.
+### Zakres testów
 
-**Testy integracyjne** sprawdzają współpracę części systemu z prawdziwą bazą PostgreSQL z `docker-compose.yml`: API ↔ baza, uprawnienia ról z `db/init/01-roles.sh` oraz aplikację klienta ↔ API ↔ baza. Wymagają Dockera i pliku `.env` (kopia `.env.example`); dane dostępowe są czytane z `DATABASE_URL` i `MIGRATION_DATABASE_URL`. Pliki mają sufiks `.integration.test.*` i leżą w `test/integration/` danej części – `npm test` je pomija. Testy działają na bazie deweloperskiej `bank`, ale tworzą tylko tymczasowe tabele o unikalnych nazwach (`it_test_…`) i usuwają je po sobie. Gdy baza nie działa, kończą się czytelnym komunikatem z poleceniem do uruchomienia.
+| Rodzaj (wymóg etapu 3) | Liczba | Pliki |
+|---|---|---|
+| Testy jednostkowe (min. 8) | 10 | `server/test/app.test.js`, `server/test/health.test.js` (blok „GET /health przy niedziałającej bazie danych”), `client/test/lib/format.test.ts`, `client/test/lib/api-health.test.ts` |
+| Testy integracyjne (min. 5) | 5 | `server/test/integration/*.integration.test.js`, `client/test/integration/api-health.integration.test.ts` |
+| Scenariusze bezpieczeństwa (min. 2) | 2 (8 testów) | `server/test/security/db-privileges.integration.test.js`, `server/test/security/api-access-control.test.js` |
+| Test endpointu (min. 1) | 1 | `server/test/health.test.js` (blok „Test endpointu: GET /health”) |
 
-**Scenariusze bezpieczeństwa** leżą w `server/test/security/`. Nazwa bloku `describe` zaczyna się od *„Scenariusz bezpieczeństwa N:”* i opisuje sprawdzane zabezpieczenie, a komentarz na początku pliku – zagrożenie, przed którym chroni:
+- **Jednostkowe** sprawdzają pojedyncze funkcje bez bazy i sieci: formatowanie kwot i dat, odmianę przez liczby, odczyt odpowiedzi `/health` przez aplikację klienta, obsługę błędów API (400, 404) i zachowanie `/health` przy niedziałającej bazie (błąd, przekroczenie limitu czasu, wyjątek). Sprawdzane są dane poprawne i błędne, np. poprawne kwoty i kwota poza zakresem w `formatPLN`, działająca i niedziałająca baza w `/health`.
+- **Integracyjne** sprawdzają współpracę części systemu z prawdziwą bazą PostgreSQL z `docker-compose.yml`: API ↔ baza, uprawnienia ról z `db/init/01-roles.sh`, API ↔ baza, która przyjmuje połączenie, ale nie odpowiada, oraz aplikację klienta ↔ API ↔ baza.
+- **Scenariusze bezpieczeństwa:**
+  1. *Konto API `bank_app` nie może rozszerzyć swoich uprawnień w bazie:* nie przełączy się na `bank_migrator` ani `postgres`, nie nada sobie ról ani atrybutów i nie odczyta skrótów haseł ani plików serwera. Chroni przed skutkami przejęcia API lub wycieku `DATABASE_URL`.
+  2. *Niezaufany klient nie uzyska z API dostępu ani szczegółów serwera:* obca domena nie odczyta odpowiedzi (CORS), API nie ujawnia technologii serwera, wysyła `nosniff`, odrzuca zbyt duże żądanie (413) bez śladu stosu, a `/health` nie ujawnia treści błędu bazy.
+- **Test endpointu** sprawdza, czy `GET /health` zwraca kod `200` i `"status": "ok"`, gdy aplikacja jest uruchomiona. Ten sam endpoint z prawdziwą bazą sprawdza dodatkowo test integracyjny `health.integration.test.js`.
 
-1. `db-privileges.integration.test.js` – konto API `bank_app` nie może rozszerzyć swoich uprawnień w bazie (przełączyć się na inną rolę, nadać sobie ról, odczytać skrótów haseł ani plików serwera). Wymaga bazy, uruchamiany razem z testami integracyjnymi.
-2. `api-access-control.test.js` – niezaufany klient (obca domena, niezalogowany użytkownik) nie uzyska z API dostępu ani szczegółów serwera (CORS, nagłówki, odpowiedź na zbyt duże żądanie). Nie wymaga bazy, uruchamiany przez `npm test`.
+### Zasady
 
-**Nazewnictwo.** Blok `describe` nazywa testowaną jednostkę (funkcję, moduł lub endpoint), a nazwa testu opisuje po polsku oczekiwany wynik i warunek, w schemacie *„<co robi>, gdy <warunek>”*, np.:
+- **Osobny katalog.** Testy leżą w katalogu `test/` danej części i odwzorowują strukturę kodu, np. `client/lib/format.ts` → `client/test/lib/format.test.ts`. Testy integracyjne mają sufiks `.integration.test.*` i leżą w `test/integration/` (`npm test` je pomija), scenariusze bezpieczeństwa – w `server/test/security/`, pliki pomocnicze – w `test/helpers/`. Wspólna konfiguracja (`test/setup.mjs`) ustawia strefę czasową UTC i podstawia pusty moduł za pakiet `server-only` z Next.js.
+- **Niezależność od danych i kolejności.** Każdy test tworzy własne dane: serwer API startuje na losowym porcie, a testy integracyjne tworzą tymczasowe tabele o unikalnych nazwach (`it_test_…`) i usuwają je po sobie. Każdy plik działa w osobnym procesie.
+- **Bez zewnętrznych zasobów.** Testy nie łączą się z zewnętrznymi API, nie wysyłają e-maili i nie korzystają z produkcyjnej bazy – testy integracyjne używają lokalnej bazy z Dockera. Nie zawierają ścieżek zależnych od systemu operacyjnego.
+- **Szybkość.** `npm test` trwa ok. 0,2 s, testy integracyjne – poniżej 1 s. Testy przekroczenia limitu czasu skracają go z 2 s do 50–200 ms (opcja `healthTimeoutMs` w `createApp`).
+- **Brak plików wynikowych.** Testy nie zapisują plików. Ewentualny katalog `coverage/` jest wykluczony w `.gitignore`.
+- **Bezpieczeństwo uprawnień.** Gdy test `nie może łączyć się z bazami innymi niż bank` nie przechodzi na istniejącej bazie, ma ona uprawnienia sprzed poprawki z issue #19. Skrypt `db/init/` działa tylko przy pierwszym starcie, więc trzeba utworzyć bazę od nowa (`docker compose down -v`, **usuwa dane**) albo wykonać poprawkę ręcznie:
+  ```bash
+  docker compose exec db psql -U postgres -d bank -c 'REVOKE CONNECT ON DATABASE postgres FROM PUBLIC' -c 'REVOKE CONNECT ON DATABASE template1 FROM PUBLIC'
+  ```
+
+**Nazewnictwo.** Blok `describe` nazywa testowaną jednostkę (funkcję, moduł, endpoint lub scenariusz bezpieczeństwa), a nazwa testu opisuje po polsku oczekiwany wynik i warunek w schemacie *„<co robi>, gdy <warunek>”*, np.:
 
 ```
 formatPLN › zgłasza błąd, gdy kwota przekracza zakres bezpiecznych liczb całkowitych
-GET /health zwraca 503, gdy sprawdzenie bazy rzuca wyjątek synchronicznie
+GET /health przy niedziałającej bazie danych › zwraca 503 po upływie limitu czasu, gdy baza nie odpowiada wcale
 ```
 
-**Znane błędy.** Test, który wykrył błąd jeszcze niepoprawiony, ma opcję `{ todo: "Problem N z issue #NN: …" }` (numer issue, w którym opisano błąd). Jest uruchamiany i widoczny w raporcie jako `✖ … # Problem N…`, ale nie przerywa `npm test`. Po poprawieniu błędu należy usunąć opcję `todo` – od tej chwili test pilnuje, żeby błąd nie wrócił.
+**Znane błędy.** Test, który wykrył błąd jeszcze niepoprawiony, dostaje opcję `{ todo: "Problem N z issue #NN: …" }`. Jest uruchamiany i widoczny w raporcie jako `⚠ … # Problem N…`, ale nie przerywa `npm test`. Po poprawieniu błędu należy usunąć opcję `todo`. Obecnie wszystkie wykryte błędy są poprawione i żaden test nie ma tej opcji.
 
 ## Bezpieczeństwo konfiguracji
 
 - Hasła i dane dostępowe znajdują się wyłącznie w pliku `.env`, nigdy w kodzie ani w repozytorium.
 - API łączy się z bazą kontem `bank_app`, które może jedynie odczytywać i modyfikować dane – nie może tworzyć, zmieniać ani usuwać tabel. Zmiany struktury bazy wykonuje osobne konto `bank_migrator` (zasada minimalnych uprawnień).
+- Konto `bank_app` może łączyć się wyłącznie z bazą `bank` – dostęp `PUBLIC` do baz systemowych `postgres` i `template1` jest odebrany.
 - Port bazy danych jest dostępny wyłącznie z lokalnej maszyny (`127.0.0.1`).
+- API odpowiada na błędy (400, 404, 413, 500) w formacie JSON, bez śladu stosu i szczegółów serwera, oraz wysyła nagłówek `X-Content-Type-Options: nosniff`.
 - Wszystkie zapytania do bazy są parametryzowane.
