@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { connection } from "next/server";
 import { Card } from "@/components/ui/Card";
 import { PageHeader } from "@/components/ui/PageHeader";
@@ -38,7 +39,31 @@ function ServiceRow({ name, description, tone }: { name: string; description: st
   );
 }
 
-export default async function StatusPage() {
+export default function StatusPage() {
+  return (
+    <>
+      <PageHeader
+        title="Status połączenia"
+        description="Wynik zapytania GET /health wysłanego z Next.js do serwera Express."
+        actions={<RefreshButton />}
+      />
+      {/* Przy cacheComponents dane z czasu żądania muszą być w <Suspense> — inaczej `next build` się nie powiedzie. */}
+      <Suspense fallback={<StatusSkeleton />}>
+        <StatusContent />
+      </Suspense>
+    </>
+  );
+}
+
+function StatusSkeleton() {
+  return (
+    <div role="status" className="mb-6 rounded-xl border border-border px-5 py-4 text-muted">
+      <p className="font-semibold">Sprawdzanie połączenia z serwerem…</p>
+    </div>
+  );
+}
+
+async function StatusContent() {
   // Sprawdzenie ma się wykonywać przy każdym wejściu, nie podczas `next build`.
   await connection();
   const health = await checkApiHealth();
@@ -53,12 +78,6 @@ export default async function StatusPage() {
 
   return (
     <>
-      <PageHeader
-        title="Status połączenia"
-        description="Wynik zapytania GET /health wysłanego z Next.js do serwera Express."
-        actions={<RefreshButton />}
-      />
-
       <div
         role="status"
         className={`mb-6 rounded-xl border px-5 py-4 ${

@@ -18,6 +18,10 @@ function sendError(res, status) {
 /**
  * Tworzy aplikację Express. Zależności (np. sprawdzanie bazy) są przekazywane
  * z zewnątrz, żeby dało się ją testować bez prawdziwego PostgreSQL.
+ *
+ * @param {object} options
+ * @param {() => unknown} options.checkDatabase sprawdzenie połączenia z bazą (GET /health)
+ * @param {number} [options.healthTimeoutMs] limit czasu sprawdzenia bazy, domyślnie 2000 ms
  */
 function createApp({ checkDatabase, healthTimeoutMs }) {
   const app = express();
