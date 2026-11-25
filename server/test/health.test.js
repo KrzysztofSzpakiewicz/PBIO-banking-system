@@ -1,19 +1,6 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
-const { createApp } = require("../src/app");
-
-// Uruchamia aplikację na losowym porcie i zwraca adres + funkcję zamykającą.
-async function startServer(checkDatabase) {
-  const app = createApp({ checkDatabase });
-  const server = await new Promise((resolve) => {
-    const s = app.listen(0, () => resolve(s));
-  });
-  const { port } = server.address();
-  return {
-    url: `http://127.0.0.1:${port}`,
-    close: () => new Promise((resolve) => server.close(resolve)),
-  };
-}
+const { startServer } = require("./helpers/start-server");
 
 test("GET /health zwraca 200, gdy baza odpowiada", async () => {
   const server = await startServer(async () => {});
@@ -56,6 +43,23 @@ test("GET /health nie wisi, gdy baza nie odpowiada w ogóle", async () => {
     const res = await fetch(`${server.url}/health`);
     assert.equal(res.status, 503);
     assert.ok(Date.now() - started < 5_000);
+  } finally {
+    await server.close();
+  }
+});
+
+test("GET /health zwraca 503, gdy sprawdzenie bazy rzuca wyjątek synchronicznie", async (t) => {
+  const logError = t.mock.method(console, "error", () => {});
+  const server = await startServer(() => {
+    throw new Error("connect ECONNREFUSED 127.0.0.1:5432");
+  });
+  try {
+    const res = await fetch(`${server.url}/health`);
+    const body = await res.json();
+
+    assert.equal(res.status, 503);
+    assert.deepEqual(body.services, { api: "ok", database: "error" });
+    assert.equal(logError.mock.callCount(), 1, "błąd powinien trafić do logów serwera");
   } finally {
     await server.close();
   }
