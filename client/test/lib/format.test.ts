@@ -2,8 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { formatDate, formatPLN, plural } from "../../lib/format.ts";
 
-// Testy oznaczone `todo` opisują błędy zgłoszone w issue #16 (do poprawy w osobnym zadaniu).
-// Są uruchamiane i raportowane, ale nie przerywają `npm test`. Po poprawce usuń opcję `todo`.
+// Błędy wykryte tymi testami (Problemy 3 i 4 z issue #16) poprawiono w issue #19.
 
 describe("formatPLN", () => {
   it("formatuje kwoty z kryterium akceptacji nr 3, gdy podano je w groszach", () => {
@@ -13,14 +12,10 @@ describe("formatPLN", () => {
     assert.equal(formatPLN(0), "0,00 PLN");
   });
 
-  it(
-    "zgłasza błąd, gdy kwota przekracza zakres bezpiecznych liczb całkowitych",
-    { todo: "Problem 3 z issue #16: kwota jest po cichu zaokrąglana i wyświetlana błędnie" },
-    () => {
-      // 9 007 199 254 740 993 gr nie da się zapisać dokładnie w typie number.
-      assert.throws(() => formatPLN(Number.MAX_SAFE_INTEGER + 2), /całkowitą/);
-    },
-  );
+  it("zgłasza błąd, gdy kwota przekracza zakres bezpiecznych liczb całkowitych", () => {
+    // 9 007 199 254 740 993 gr nie da się zapisać dokładnie w typie number.
+    assert.throws(() => formatPLN(Number.MAX_SAFE_INTEGER + 2), /całkowitą/);
+  });
 });
 
 describe("plural", () => {
@@ -34,12 +29,8 @@ describe("plural", () => {
 });
 
 describe("formatDate", () => {
-  it(
-    "pokazuje datę w strefie Europe/Warsaw, gdy serwer działa w strefie UTC",
-    { todo: "Problem 4 z issue #16: data zależy od strefy czasowej serwera" },
-    () => {
-      // 23:30 UTC 9 listopada to już 00:30 10 listopada w Polsce.
-      assert.equal(formatDate("2026-11-09T23:30:00Z"), "10.11.2026");
-    },
-  );
+  it("pokazuje datę w strefie Europe/Warsaw, gdy serwer działa w strefie UTC", () => {
+    // 23:30 UTC 9 listopada to już 00:30 10 listopada w Polsce.
+    assert.equal(formatDate("2026-11-09T23:30:00Z"), "10.11.2026");
+  });
 });

@@ -9,8 +9,9 @@ const groupFormatter = new Intl.NumberFormat("pl-PL", {
 });
 
 export function formatPLN(grosze: number, options?: { signed?: boolean }): string {
-  if (!Number.isInteger(grosze)) {
-    throw new Error("Kwota musi być liczbą całkowitą groszy");
+  // isSafeInteger: powyżej 2^53 − 1 typ number traci dokładność i kwota byłaby po cichu zaokrąglona.
+  if (!Number.isSafeInteger(grosze)) {
+    throw new Error("Kwota musi być liczbą całkowitą groszy w zakresie bezpiecznych liczb całkowitych");
   }
 
   const abs = Math.abs(grosze);
@@ -30,13 +31,18 @@ export function plural(n: number, one: string, few: string, many: string): strin
   return many;
 }
 
-const dateFormatter =new Intl.DateTimeFormat("pl-PL", {
+// Daty zawsze w czasie polskim — niezależnie od strefy czasowej serwera, na którym renderuje się Next.js.
+const TIME_ZONE = "Europe/Warsaw";
+
+const dateFormatter = new Intl.DateTimeFormat("pl-PL", {
+  timeZone: TIME_ZONE,
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
 });
 
 const dateTimeFormatter = new Intl.DateTimeFormat("pl-PL", {
+  timeZone: TIME_ZONE,
   day: "2-digit",
   month: "2-digit",
   year: "numeric",
