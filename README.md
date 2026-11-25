@@ -186,11 +186,17 @@ Testy korzystają z wbudowanego w Node.js modułu `node:test` – nie wymagają 
 | `npm test --prefix server` / `npm test --prefix client` | testy tylko jednej części |
 | `npm run test:integration` | testy integracyjne: uruchamia bazę (`docker compose up -d --wait db`) i wykonuje testy |
 | `npm run test:integration:run` | testy integracyjne bez uruchamiania bazy (gdy baza już działa) |
+| `npm run test:security` | tylko scenariusze bezpieczeństwa (`server/test/security/`, uruchamia bazę) |
 | `npm run test:all` | testy jednostkowe, a po nich integracyjne |
 
 **Struktura.** Testy leżą w katalogu `test/` danej części i odwzorowują strukturę kodu, np. `client/lib/format.ts` → `client/test/lib/format.test.ts`. Pliki pomocnicze (bez sufiksu `.test`) trafiają do `test/helpers/`. Wspólna konfiguracja (`test/setup.mjs` w katalogu głównym) ustawia strefę czasową UTC i podstawia pusty moduł za pakiet `server-only` z Next.js.
 
 **Testy integracyjne** sprawdzają współpracę części systemu z prawdziwą bazą PostgreSQL z `docker-compose.yml`: API ↔ baza, uprawnienia ról z `db/init/01-roles.sh` oraz aplikację klienta ↔ API ↔ baza. Wymagają Dockera i pliku `.env` (kopia `.env.example`); dane dostępowe są czytane z `DATABASE_URL` i `MIGRATION_DATABASE_URL`. Pliki mają sufiks `.integration.test.*` i leżą w `test/integration/` danej części – `npm test` je pomija. Testy działają na bazie deweloperskiej `bank`, ale tworzą tylko tymczasowe tabele o unikalnych nazwach (`it_test_…`) i usuwają je po sobie. Gdy baza nie działa, kończą się czytelnym komunikatem z poleceniem do uruchomienia.
+
+**Scenariusze bezpieczeństwa** leżą w `server/test/security/`. Nazwa bloku `describe` zaczyna się od *„Scenariusz bezpieczeństwa N:”* i opisuje sprawdzane zabezpieczenie, a komentarz na początku pliku – zagrożenie, przed którym chroni:
+
+1. `db-privileges.integration.test.js` – konto API `bank_app` nie może rozszerzyć swoich uprawnień w bazie (przełączyć się na inną rolę, nadać sobie ról, odczytać skrótów haseł ani plików serwera). Wymaga bazy, uruchamiany razem z testami integracyjnymi.
+2. `api-access-control.test.js` – niezaufany klient (obca domena, niezalogowany użytkownik) nie uzyska z API dostępu ani szczegółów serwera (CORS, nagłówki, odpowiedź na zbyt duże żądanie). Nie wymaga bazy, uruchamiany przez `npm test`.
 
 **Nazewnictwo.** Blok `describe` nazywa testowaną jednostkę (funkcję, moduł lub endpoint), a nazwa testu opisuje po polsku oczekiwany wynik i warunek, w schemacie *„<co robi>, gdy <warunek>”*, np.:
 

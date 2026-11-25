@@ -11,6 +11,7 @@
     "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=\"server/src/**\" --test-coverage-include=\"client/lib/**\" --test-reporter=spec --import ./test/setup.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \"server/test/**/!(*.integration).test.js\" \"client/test/**/!(*.integration).test.ts\"",
     "test:integration": "docker compose up -d --wait db && npm run test:integration:run",
     "test:integration:run": "node --test --test-concurrency=1 --env-file-if-exists=.env --test-reporter=spec --import ./test/setup.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \"server/test/**/*.integration.test.js\" \"client/test/**/*.integration.test.ts\"",
+    "test:security": "docker compose up -d --wait db && node --test --test-concurrency=1 --env-file-if-exists=.env --test-reporter=spec --import ./test/setup.mjs --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \"server/test/security/*.test.js\"",
     "test:all": "npm test && npm run test:integration"
   }
 }
