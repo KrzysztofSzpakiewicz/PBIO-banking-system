@@ -21,6 +21,7 @@ Szczegółowe wymagania funkcjonalne i bezpieczeństwa: [REQUIREMENTS.md](REQUIR
 | `client/` | aplikacja klienta (Next.js) |
 | `admin/` | panel administratora (Next.js) |
 | `server/src/` | API (Express.js) |
+| `server/migrations/` | migracje SQL schematu bazy (wykonywane automatycznie przy starcie API) |
 | `server/test/`, `client/test/` | testy jednostkowe, integracyjne i scenariusze bezpieczeństwa (sekcja *Testy*) |
 | `docs/RAPORT-TESTOW.md` | raport z wynikami testów |
 | `test/setup.mjs`, `package.json` | wspólna konfiguracja i skrypty testów (jednostkowych i integracyjnych) |
@@ -71,7 +72,7 @@ npm run dev --prefix server      # tryb deweloperski (restart po zmianie plików
 npm start --prefix server
 ```
 
-Po poprawnym starcie w konsoli pojawi się `Połączono z PostgreSQL` oraz adres serwera. Jeśli baza jest niedostępna, serwer kończy działanie z komunikatem błędu.
+Przy starcie API wykonuje nowe migracje z `server/migrations/` kontem `bank_migrator` (przy pierwszym starcie: `Zastosowano migrację: 001_initial_schema.sql`). Migracje już zastosowane są pomijane – ich lista jest w tabeli `schema_migrations`. Po poprawnym starcie w konsoli pojawi się `Połączono z PostgreSQL` oraz adres serwera. Jeśli baza jest niedostępna, serwer kończy działanie z komunikatem błędu.
 
 **3. Aplikacja klienta**
 
@@ -171,7 +172,7 @@ docker compose start db
 
 ## Testy
 
-Szczegółowy opis każdego testu i wyniki ostatniego uruchomienia: [docs/RAPORT-TESTOW.md](docs/RAPORT-TESTOW.md).
+Szczegółowy opis każdego testu i wyniki ostatniego uruchomienia: [docs/RAPORT-TESTOW.md](docs/RAPORT-TESTOW.md). Podsumowanie – podsekcja *Raport z testów* poniżej.
 
 ### Narzędzie
 
@@ -203,12 +204,12 @@ Do `npm test` wystarczą zależności z `npm ci --prefix server` (sekcja *Instal
 | Rodzaj (wymóg etapu 3) | Liczba | Pliki |
 |---|---|---|
 | Testy jednostkowe (min. 8) | 10 | `server/test/app.test.js`, `server/test/health.test.js` (blok „GET /health przy niedziałającej bazie danych”), `client/test/lib/format.test.ts`, `client/test/lib/api-health.test.ts` |
-| Testy integracyjne (min. 5) | 5 | `server/test/integration/*.integration.test.js`, `client/test/integration/api-health.integration.test.ts` |
+| Testy integracyjne (min. 5) | 7 | `server/test/integration/*.integration.test.js`, `client/test/integration/api-health.integration.test.ts` |
 | Scenariusze bezpieczeństwa (min. 2) | 2 (8 testów) | `server/test/security/db-privileges.integration.test.js`, `server/test/security/api-access-control.test.js` |
 | Test endpointu (min. 1) | 1 | `server/test/health.test.js` (blok „Test endpointu: GET /health”) |
 
 - **Jednostkowe** sprawdzają pojedyncze funkcje bez bazy i sieci: formatowanie kwot i dat, odmianę przez liczby, odczyt odpowiedzi `/health` przez aplikację klienta, obsługę błędów API (400, 404) i zachowanie `/health` przy niedziałającej bazie (błąd, przekroczenie limitu czasu, wyjątek). Sprawdzane są dane poprawne i błędne, np. poprawne kwoty i kwota poza zakresem w `formatPLN`, działająca i niedziałająca baza w `/health`.
-- **Integracyjne** sprawdzają współpracę części systemu z prawdziwą bazą PostgreSQL z `docker-compose.yml`: API ↔ baza, uprawnienia ról z `db/init/01-roles.sh`, API ↔ baza, która przyjmuje połączenie, ale nie odpowiada, oraz aplikację klienta ↔ API ↔ baza.
+- **Integracyjne** sprawdzają współpracę części systemu z prawdziwą bazą PostgreSQL z `docker-compose.yml`: API ↔ baza, uprawnienia ról z `db/init/01-roles.sh`, API ↔ baza, która przyjmuje połączenie, ale nie odpowiada, aplikację klienta ↔ API ↔ baza oraz schemat po migracjach (nieujemne saldo, niemodyfikowalna historia operacji).
 - **Scenariusze bezpieczeństwa:**
   1. *Konto API `bank_app` nie może rozszerzyć swoich uprawnień w bazie:* nie przełączy się na `bank_migrator` ani `postgres`, nie nada sobie ról ani atrybutów i nie odczyta skrótów haseł ani plików serwera. Chroni przed skutkami przejęcia API lub wycieku `DATABASE_URL`.
   2. *Niezaufany klient nie uzyska z API dostępu ani szczegółów serwera:* obca domena nie odczyta odpowiedzi (CORS), API nie ujawnia technologii serwera, wysyła `nosniff`, odrzuca zbyt duże żądanie (413) bez śladu stosu, a `/health` nie ujawnia treści błędu bazy.
@@ -217,7 +218,7 @@ Do `npm test` wystarczą zależności z `npm ci --prefix server` (sekcja *Instal
 ### Zasady
 
 - **Osobny katalog.** Testy leżą w katalogu `test/` danej części i odwzorowują strukturę kodu, np. `client/lib/format.ts` → `client/test/lib/format.test.ts`. Testy integracyjne mają sufiks `.integration.test.*` i leżą w `test/integration/` (`npm test` je pomija), scenariusze bezpieczeństwa – w `server/test/security/`, pliki pomocnicze – w `test/helpers/`. Wspólna konfiguracja (`test/setup.mjs`) ustawia strefę czasową UTC i podstawia pusty moduł za pakiet `server-only` z Next.js.
-- **Niezależność od danych i kolejności.** Każdy test tworzy własne dane: serwer API startuje na losowym porcie, a testy integracyjne tworzą tymczasowe tabele o unikalnych nazwach (`it_test_…`) i usuwają je po sobie. Każdy plik działa w osobnym procesie.
+- **Niezależność od danych i kolejności.** Każdy test tworzy własne dane: serwer API startuje na losowym porcie, a testy integracyjne tworzą tymczasowe tabele o unikalnych nazwach (`it_test_…`) i usuwają je po sobie albo działają w transakcji wycofywanej na końcu testu. Każdy plik działa w osobnym procesie.
 - **Bez zewnętrznych zasobów.** Testy nie łączą się z zewnętrznymi API, nie wysyłają e-maili i nie korzystają z produkcyjnej bazy – testy integracyjne używają lokalnej bazy z Dockera. Nie zawierają ścieżek zależnych od systemu operacyjnego.
 - **Szybkość.** `npm test` trwa ok. 0,2 s, testy integracyjne – poniżej 1 s. Testy przekroczenia limitu czasu skracają go z 2 s do 50–200 ms (opcja `healthTimeoutMs` w `createApp`).
 - **Brak plików wynikowych.** Testy nie zapisują plików. Ewentualny katalog `coverage/` jest wykluczony w `.gitignore`.
@@ -235,11 +236,39 @@ GET /health przy niedziałającej bazie danych › zwraca 503 po upływie limitu
 
 **Znane błędy.** Test, który wykrył błąd jeszcze niepoprawiony, dostaje opcję `{ todo: "Problem N z issue #NN: …" }`. Jest uruchamiany i widoczny w raporcie jako `⚠ … # Problem N…`, ale nie przerywa `npm test`. Po poprawieniu błędu należy usunąć opcję `todo`. Obecnie wszystkie wykryte błędy są poprawione i żaden test nie ma tej opcji.
 
+### Raport z testów
+
+Ostatnie uruchomienie: 25.11.2026, `npm run test:all`, Node.js 24, PostgreSQL 17 (Docker). Pełny raport z opisem każdego testu i zrzutami ekranu: [docs/RAPORT-TESTOW.md](docs/RAPORT-TESTOW.md).
+
+| Rodzaj | Wymagane | Zrealizowane | Wynik |
+|---|---|---|---|
+| Testy jednostkowe | 8 | 10 | ✅ 10/10 |
+| Test endpointu (`GET /health` → `200`, `"status": "ok"`) | 1 | 1 | ✅ 1/1 |
+| Scenariusze bezpieczeństwa | 2 | 2 (8 testów) | ✅ 8/8 |
+| Testy integracyjne | 5 | 7 | ✅ 7/7 |
+| **Razem** | | **26** | **✅ 26/26**, 0 znanych błędów (`todo`) |
+
+Czas: `npm test` ≈ 0,2 s, `npm run test:integration:run` ≈ 0,9 s. Obie aplikacje Next.js przechodzą też `npm run lint` i `npm run build`, a `npm audit` nie zgłasza podatności.
+
+**Błędy wykryte przez testy i poprawione** (szczegóły w raporcie, sekcja 3):
+
+| Wykryty błąd | Poprawka |
+|---|---|
+| uszkodzone lub zbyt duże żądanie i nieistniejąca ścieżka → strona HTML ze śladem stosu i ścieżkami serwera | obsługa błędów API w formacie JSON bez szczegółów (`server/src/app.js`) |
+| brak nagłówka `X-Content-Type-Options: nosniff` | nagłówek w każdej odpowiedzi API |
+| `formatPLN` po cichu zaokrąglał kwoty powyżej 2⁵³ − 1 gr | `Number.isSafeInteger` |
+| daty zależne od strefy czasowej serwera | `timeZone: "Europe/Warsaw"` |
+| `bank_app` mógł łączyć się z bazami `postgres` i `template1` | `REVOKE CONNECT … FROM PUBLIC` w `db/init/01-roles.sh` |
+| brak schematu bazy na `develop` (PR #12 scalony do innej gałęzi) | scalenie migracji do `develop` |
+| `next build` nie przechodził (`/status` bez `<Suspense>`, podatna wersja Next.js) | `<Suspense>` na `/status`, Next.js 16.4.6 |
+| testy `/health`: 2 s oczekiwania, logi w wyniku, niejasne nazwy | konfigurowalny limit czasu, wyciszone logi, nowe nazwy |
+
 ## Bezpieczeństwo konfiguracji
 
 - Hasła i dane dostępowe znajdują się wyłącznie w pliku `.env`, nigdy w kodzie ani w repozytorium.
 - API łączy się z bazą kontem `bank_app`, które może jedynie odczytywać i modyfikować dane – nie może tworzyć, zmieniać ani usuwać tabel. Zmiany struktury bazy wykonuje osobne konto `bank_migrator` (zasada minimalnych uprawnień).
 - Konto `bank_app` może łączyć się wyłącznie z bazą `bank` – dostęp `PUBLIC` do baz systemowych `postgres` i `template1` jest odebrany.
 - Port bazy danych jest dostępny wyłącznie z lokalnej maszyny (`127.0.0.1`).
+- Zapisy historii operacji (`transfers`, `ledger_entries`) są niemodyfikowalne dla konta `bank_app` – migracja odbiera mu prawa `UPDATE` i `DELETE`.
 - API odpowiada na błędy (400, 404, 413, 500) w formacie JSON, bez śladu stosu i szczegółów serwera, oraz wysyła nagłówek `X-Content-Type-Options: nosniff`.
 - Wszystkie zapytania do bazy są parametryzowane.

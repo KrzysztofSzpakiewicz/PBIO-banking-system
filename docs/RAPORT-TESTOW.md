@@ -3,11 +3,11 @@
 | | |
 |---|---|
 | **Data uruchomienia** | 25.11.2026 |
-| **Gałąź / wersja** | `develop` po scaleniu issue #18 i #19 |
+| **Gałąź / wersja** | `develop` po scaleniu issue #18, #19 i schematu bazy z PR #12 |
 | **Narzędzie** | `node:test` + `node:assert/strict` (wbudowane w Node.js) |
 | **Środowisko** | Node.js 24.22.1, macOS, PostgreSQL 17 (`postgres:17-alpine` z `docker-compose.yml`) |
 | **Polecenie** | `npm run test:all` (= `npm test` + `npm run test:integration`) |
-| **Wynik** | **24 / 24 testy zaliczone**, 0 niezaliczonych, 0 oznaczonych jako znany błąd (`todo`) |
+| **Wynik** | **26 / 26 testów zaliczonych**, 0 niezaliczonych, 0 oznaczonych jako znany błąd (`todo`) |
 
 ## 1. Podsumowanie
 
@@ -16,10 +16,12 @@
 | Testy jednostkowe | 8 | 10 | 10 | |
 | Test endpointu | 1 | 1 | 1 | |
 | Scenariusze bezpieczeństwa | 2 | 2 (8 testów) | 8 | |
-| Testy integracyjne | 5 | 5 | 5 | |
-| **Razem** | | **24 testy** | **24** | `npm test` ≈ 0,2 s, integracyjne ≈ 0,8 s |
+| Testy integracyjne | 5 | 7 | 7 | |
+| **Razem** | | **26 testów** | **26** | `npm test` ≈ 0,2 s, integracyjne ≈ 0,9 s |
 
-`npm test` uruchamia 16 testów: jednostkowe, test endpointu i scenariusz bezpieczeństwa 2. `npm run test:integration` uruchamia 8 testów: integracyjne i scenariusz bezpieczeństwa 1, który wymaga bazy danych.
+`npm test` uruchamia 16 testów: jednostkowe, test endpointu i scenariusz bezpieczeństwa 2. `npm run test:integration` uruchamia 10 testów: integracyjne i scenariusz bezpieczeństwa 1, który wymaga bazy danych.
+
+Dodatkowo obie aplikacje Next.js przechodzą `npm run lint` i `npm run build` bez błędów (sekcja 3).
 
 ## 2. Opis wykonanych testów
 
@@ -74,9 +76,9 @@ Zagrożenie: niezalogowany użytkownik albo obca strona internetowa próbuje odc
 | B2.4 | odrzuca treść większą niż 100 kB kodem 413 w formacie JSON bez śladu stosu | żądanie 150 kB | `413`, JSON, brak śladu stosu i ścieżek |
 | B2.5 | zwraca z /health tylko pola status, services i timestamp, gdy błąd bazy zawiera konto i adres serwera | wymuszony błąd bazy z nazwą konta, hostem i portem | tylko 3 pola, bez treści błędu. Błąd trafia do logów serwera |
 
-### 2.4. Testy integracyjne (5)
+### 2.4. Testy integracyjne (7)
 
-Sprawdzają współpracę kilku części systemu z prawdziwą bazą PostgreSQL. Tworzą tylko tymczasowe tabele o unikalnych nazwach (`it_test_…`) i usuwają je po sobie.
+Sprawdzają współpracę kilku części systemu z prawdziwą bazą PostgreSQL. Tworzą tylko tymczasowe tabele o unikalnych nazwach (`it_test_…`) i usuwają je po sobie albo działają w transakcji wycofywanej na końcu testu.
 
 | # | Plik › blok | Nazwa testu | Współpracujące elementy |
 |---|---|---|---|
@@ -85,10 +87,12 @@ Sprawdzają współpracę kilku części systemu z prawdziwą bazą PostgreSQL. 
 | I3 | `server/test/integration/health-unresponsive-database.integration.test.js` › GET /health z bazą, która nie odpowiada | zwraca 503 po upływie limitu czasu, gdy PostgreSQL przyjmuje połączenie, ale nie odpowiada | Express → `db/pool.js` → serwer TCP, który nie odpowiada |
 | I4 | `server/test/integration/db-roles.integration.test.js` › Uprawnienia konta bank_app | odczytuje i modyfikuje dane w tabelach bank_migrator, ale nie może zmieniać struktury bazy | `db/init/01-roles.sh`: tabela tworzona przez `bank_migrator`, operacje CRUD i odmowy DDL dla `bank_app` |
 | I5 | › Uprawnienia konta bank_app | nie może łączyć się z bazami innymi niż bank, gdy podaje poprawne hasło | `db/init/01-roles.sh`: brak dostępu do `postgres` i `template1` |
+| I6 | `server/test/integration/db-schema.integration.test.js` › Schemat bazy po migracjach | tworzy rachunek z saldem 0 PLN i odrzuca ujemne saldo, gdy bank_app zapisuje dane | runner migracji (`src/db/migrate.js`) → schemat `001_initial_schema.sql` → zapis kontem `bank_app` i ograniczenie `CHECK` salda |
+| I7 | › Schemat bazy po migracjach | odmawia zmiany i usunięcia zapisów historii operacji, gdy bank_app próbuje je edytować | migracja odbiera `bank_app` prawa `UPDATE`/`DELETE` do `ledger_entries` – historia operacji jest niemodyfikowalna |
 
 ## 3. Wykryte i poprawione błędy
 
-Testy przygotowane w issue #16, #17 i #18 wykryły poniższe błędy. Do czasu poprawki takie testy miały opcję `todo`. Wszystkie błędy poprawiono w issue #19 i usunięto opcję `todo`, więc te same testy pilnują teraz, żeby błędy nie wróciły.
+Testy przygotowane w issue #16, #17 i #18 oraz sprawdzenie lint/build przed oddaniem wykryły poniższe błędy. Do czasu poprawki takie testy miały opcję `todo`. Wszystkie błędy poprawiono w issue #19 i usunięto opcję `todo`, więc te same testy pilnują teraz, żeby błędy nie wróciły.
 
 | Problem | Wykrył test | Opis błędu | Poprawka |
 |---|---|---|---|
@@ -103,6 +107,9 @@ Testy przygotowane w issue #16, #17 i #18 wykryły poniższe błędy. Do czasu p
 | #18 / 4 | J8, J9 | logi `console.error` zaśmiecały raport testów | logi w testach są wyciszane atrapą `t.mock.method(console, "error")` |
 | #18 / 5 | E1, J8–J10 | testy `/health` bez bloku `describe`, nieprecyzyjna nazwa „nie wisi”, test endpointu nieoznaczony | podział na bloki „Test endpointu: GET /health” i „GET /health przy niedziałającej bazie danych”, nowe nazwy |
 | #18 / 6 | B2.5 | test wycieku sprawdzał tylko słowo `password` | test sprawdza dokładny zestaw pól oraz brak nazwy konta, hosta i portu |
+| schemat | I6, I7 | schemat bazy i runner migracji z PR #12 trafiły do `feature/3-postgres-setup` zamiast do `develop` – na `develop` baza nie miała tabel | scalenie `feature/3-postgres-setup` do `develop`. Migracje wykonują się przy starcie serwera |
+| build | `npm run build` | `next build` kończył się błędem w obu aplikacjach: strona `/status` pobierała dane z czasu żądania poza `<Suspense>` (wymagane przy `cacheComponents`) | treść strony w `<Suspense>` z komunikatem „Sprawdzanie połączenia…” |
+| build | `npm audit` | Next.js 16.4.3 ze znaną podatnością (moderate) – `next build` losowo przerywał się z `SecurityFatalError` | `next` i `eslint-config-next` 16.4.6. `npm audit`: 0 podatności |
 
 ## 4. Wyniki uruchomienia
 
@@ -153,6 +160,9 @@ Testy przygotowane w issue #16, #17 i #18 wykryły poniższe błędy. Do czasu p
 ▶ Uprawnienia konta bank_app (db/init/01-roles.sh)
   ✔ odczytuje i modyfikuje dane w tabelach bank_migrator, ale nie może zmieniać struktury bazy
   ✔ nie może łączyć się z bazami innymi niż bank, gdy podaje poprawne hasło
+▶ Schemat bazy po migracjach (server/migrations)
+  ✔ tworzy rachunek z saldem 0 PLN i odrzuca ujemne saldo, gdy bank_app zapisuje dane
+  ✔ odmawia zmiany i usunięcia zapisów historii operacji, gdy bank_app próbuje je edytować
 ▶ GET /health z bazą, która nie odpowiada
   ✔ zwraca 503 po upływie limitu czasu, gdy PostgreSQL przyjmuje połączenie, ale nie odpowiada
 ▶ GET /health z prawdziwą bazą PostgreSQL
@@ -161,12 +171,12 @@ Testy przygotowane w issue #16, #17 i #18 wykryły poniższe błędy. Do czasu p
   ✔ odmawia przełączenia na konto bank_migrator lub postgres, gdy bank_app wykona SET ROLE
   ✔ odmawia nadania sobie ról i atrybutów, gdy bank_app wykona GRANT, ALTER ROLE lub CREATE ROLE
   ✔ odmawia odczytu skrótów haseł i plików serwera, gdy bank_app odpyta katalog systemowy
-ℹ tests 8
-ℹ suites 5
-ℹ pass 8
+ℹ tests 10
+ℹ suites 6
+ℹ pass 10
 ℹ fail 0
 ℹ todo 0
-ℹ duration_ms ≈ 750
+ℹ duration_ms ≈ 860
 ```
 
 ### 4.3. Stan przed poprawkami (issue #18)
@@ -177,6 +187,6 @@ Dla porównania: przed issue #19 `npm test` zgłaszał 15 testów, z czego 6 jak
 
 ## 5. Ograniczenia
 
-- API nie ma jeszcze uwierzytelniania ani endpointów rachunków i przelewów, a schemat bazy z PR #12 nie został scalony do `develop`. Scenariuszy typu „użytkownik A odczytuje lub obciąża rachunek użytkownika B” (kryterium akceptacji nr 2) nie da się jeszcze przetestować. Trzeba je dodać razem z implementacją (issue #20).
+- API nie ma jeszcze uwierzytelniania ani endpointów rachunków i przelewów (schemat bazy już jest). Scenariuszy typu „użytkownik A odczytuje lub obciąża rachunek użytkownika B” (kryterium akceptacji nr 2) nie da się jeszcze przetestować. Trzeba je dodać razem z implementacją (issue #20).
 - Testy integracyjne korzystają z lokalnej bazy deweloperskiej `bank` z Dockera, nie z bazy produkcyjnej. Tworzą wyłącznie tymczasowe tabele i usuwają je po sobie.
 - Komponenty React (formularz logowania, strony) nie są objęte testami automatycznymi.
