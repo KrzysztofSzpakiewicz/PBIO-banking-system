@@ -21,14 +21,15 @@ Szczegółowe wymagania funkcjonalne i bezpieczeństwa: [REQUIREMENTS.md](REQUIR
 | `client/` | aplikacja klienta (Next.js) |
 | `admin/` | panel administratora (Next.js) |
 | `server/src/` | API (Express.js) |
-| `server/test/` | testy API |
+| `server/test/`, `client/test/` | testy jednostkowe (uruchamiane poleceniem `npm test`) |
+| `test/setup.mjs`, `package.json` | wspólna konfiguracja i skrypty testów |
 | `db/init/` | skrypty inicjalizujące bazę danych (role i uprawnienia) |
 | `docker-compose.yml` | baza danych PostgreSQL |
 | `.env.example` | szablon konfiguracji (kopiowany do `.env`) |
 
 ## Wymagania środowiskowe
 
-- **Node.js ≥ 22.9** (zalecana wersja 24 LTS) – serwer korzysta z flagi `--env-file-if-exists`
+- **Node.js ≥ 22.18** (zalecana wersja 24 LTS) – serwer korzysta z flagi `--env-file-if-exists`, a testy uruchamiają pliki `.ts` bez kompilacji
 - **npm** (instalowany razem z Node.js)
 - **Docker** z Docker Compose v2 (polecenie `docker compose`)
 - wolne porty: `3000`, `3001`, `4000`, `5432`
@@ -169,11 +170,31 @@ docker compose start db
 
 ## Testy
 
+Wszystkie testy jednostkowe uruchamia jedno polecenie w katalogu głównym repozytorium:
+
 ```bash
-npm test --prefix server
+npm test
 ```
 
-Testy endpointu `/health` (`server/test/`) nie wymagają uruchomionej bazy danych.
+Testy korzystają z wbudowanego w Node.js modułu `node:test` – nie wymagają dodatkowych pakietów, uruchomionej bazy danych ani serwera. Wystarczą zależności zainstalowane krokiem `npm ci --prefix server` z sekcji *Instalacja* oraz **Node.js ≥ 22.18** (pliki `.ts` są uruchamiane bez kompilacji).
+
+| Polecenie | Działanie |
+|---|---|
+| `npm test` | wszystkie testy (API + biblioteki aplikacji klienta) |
+| `npm run test:watch` | ponowne uruchamianie testów po każdej zmianie pliku |
+| `npm run test:coverage` | testy z raportem pokrycia kodu |
+| `npm test --prefix server` / `npm test --prefix client` | testy tylko jednej części |
+
+**Struktura.** Testy leżą w katalogu `test/` danej części i odwzorowują strukturę kodu, np. `client/lib/format.ts` → `client/test/lib/format.test.ts`. Pliki pomocnicze (bez sufiksu `.test`) trafiają do `test/helpers/`. Wspólna konfiguracja (`test/setup.mjs` w katalogu głównym) ustawia strefę czasową UTC i podstawia pusty moduł za pakiet `server-only` z Next.js.
+
+**Nazewnictwo.** Blok `describe` nazywa testowaną jednostkę (funkcję, moduł lub endpoint), a nazwa testu opisuje po polsku oczekiwany wynik i warunek, w schemacie *„<co robi>, gdy <warunek>”*, np.:
+
+```
+formatPLN › zgłasza błąd, gdy kwota przekracza zakres bezpiecznych liczb całkowitych
+GET /health zwraca 503, gdy sprawdzenie bazy rzuca wyjątek synchronicznie
+```
+
+**Znane błędy.** Test, który wykrył błąd jeszcze niepoprawiony, ma opcję `{ todo: "Problem N z issue #16: …" }`. Jest uruchamiany i widoczny w raporcie jako `✖ … # Problem N…`, ale nie przerywa `npm test`. Po poprawieniu błędu należy usunąć opcję `todo` – od tej chwili test pilnuje, żeby błąd nie wrócił.
 
 ## Bezpieczeństwo konfiguracji
 
